@@ -12,12 +12,20 @@ on:
 
 jobs:
   publish-index:
-    if: ${{ secrets.ZHIWEI_INDEX_PUSH_TOKEN != '' }}
     runs-on: windows-latest
 
     steps:
       - name: Checkout plugins repo
         uses: actions/checkout@v4
+
+      - name: Validate index push token
+        shell: pwsh
+        env:
+          INDEX_PUSH_TOKEN: ${{ secrets.ZHIWEI_INDEX_PUSH_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:INDEX_PUSH_TOKEN)) {
+            throw "缺少仓库 secret: ZHIWEI_INDEX_PUSH_TOKEN"
+          }
 
       - name: Export channel index
         shell: pwsh
