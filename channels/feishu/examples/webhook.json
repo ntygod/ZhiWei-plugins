@@ -1,0 +1,8 @@
+{
+  "baseUrl": "http://127.0.0.1:19001",
+  "appId": "cli_xxxxxxxxxxxxx",
+  "appSecret": "******",
+  "connectionMode": "webhook",
+  "verificationToken": "zhiwei-feishu-token",
+  "encryptKey": "******"
+}

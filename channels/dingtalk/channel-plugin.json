@@ -1,0 +1,64 @@
+{
+  "pluginId": "dingtalk",
+  "name": "钉钉",
+  "version": "1.0.0",
+  "vendor": "zhiwei",
+  "platform": "dingtalk",
+  "connectorMode": "EXTERNAL",
+  "connectorSpec": {
+    "protocol": "http",
+    "pathPrefix": "/instances/{instanceId}",
+    "image": "ghcr.io/zhiwei/connectors/dingtalk:1.0.0"
+  },
+  "capabilities": [
+    "receive",
+    "send"
+  ],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "title": "Connector Base URL",
+        "description": "钉钉 connector 的 HTTP 基础地址。"
+      },
+      "clientId": {
+        "type": "string",
+        "title": "Client ID"
+      },
+      "clientSecret": {
+        "type": "string",
+        "title": "Client Secret",
+        "secret": true
+      },
+      "robotCode": {
+        "type": "string",
+        "title": "Robot Code"
+      }
+    },
+    "required": [
+      "baseUrl",
+      "clientId",
+      "clientSecret"
+    ]
+  },
+  "secretFields": [
+    "clientSecret"
+  ],
+  "resources": {
+    "readmePath": "docs/README.md",
+    "iconPath": "assets/icon.svg",
+    "examplePaths": [
+      "examples/default.json"
+    ],
+    "assetPaths": []
+  },
+  "setupGuide": {
+    "title": "钉钉 Connector 插件",
+    "steps": [
+      "启动钉钉 connector，并确认可通过 HTTP 访问。",
+      "填写 Connector Base URL、Client ID、Client Secret。",
+      "如果使用企业机器人，再补充 Robot Code。"
+    ]
+  }
+}

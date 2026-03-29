@@ -1,0 +1,72 @@
+{
+  "pluginId": "wecom",
+  "name": "企业微信",
+  "version": "1.0.0",
+  "vendor": "zhiwei",
+  "platform": "wecom",
+  "connectorMode": "EXTERNAL",
+  "connectorSpec": {
+    "protocol": "http",
+    "pathPrefix": "/instances/{instanceId}",
+    "image": "ghcr.io/zhiwei/connectors/wecom:1.0.0"
+  },
+  "capabilities": [
+    "receive",
+    "send"
+  ],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "title": "Connector Base URL",
+        "description": "企业微信 connector 的 HTTP 基础地址。"
+      },
+      "corpId": {
+        "type": "string",
+        "title": "Corp ID"
+      },
+      "agentId": {
+        "type": "string",
+        "title": "Agent ID"
+      },
+      "token": {
+        "type": "string",
+        "title": "Token",
+        "secret": true
+      },
+      "encodingAesKey": {
+        "type": "string",
+        "title": "Encoding AES Key",
+        "secret": true
+      }
+    },
+    "required": [
+      "baseUrl",
+      "corpId",
+      "agentId",
+      "token",
+      "encodingAesKey"
+    ]
+  },
+  "secretFields": [
+    "token",
+    "encodingAesKey"
+  ],
+  "resources": {
+    "readmePath": "docs/README.md",
+    "iconPath": "assets/icon.svg",
+    "examplePaths": [
+      "examples/default.json"
+    ],
+    "assetPaths": []
+  },
+  "setupGuide": {
+    "title": "企业微信 Connector 插件",
+    "steps": [
+      "启动企微 connector，并确认可通过 HTTP 访问。",
+      "填写 Connector Base URL、Corp ID、Agent ID、Token 和 AES Key。",
+      "在企微后台把消息回调交给 connector 暴露的 webhook。"
+    ]
+  }
+}

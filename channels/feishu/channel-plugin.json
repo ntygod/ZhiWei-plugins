@@ -1,0 +1,82 @@
+{
+  "pluginId": "feishu",
+  "name": "飞书",
+  "version": "1.0.0",
+  "vendor": "zhiwei",
+  "platform": "feishu",
+  "connectorMode": "EXTERNAL",
+  "connectorSpec": {
+    "protocol": "http",
+    "pathPrefix": "/instances/{instanceId}",
+    "image": "ghcr.io/zhiwei/connectors/feishu:1.0.0"
+  },
+  "capabilities": [
+    "receive",
+    "send",
+    "thread-reply",
+    "card-update"
+  ],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "title": "Connector Base URL",
+        "description": "飞书 connector 的 HTTP 基础地址。"
+      },
+      "appId": {
+        "type": "string",
+        "title": "App ID"
+      },
+      "appSecret": {
+        "type": "string",
+        "title": "App Secret",
+        "secret": true
+      },
+      "connectionMode": {
+        "type": "string",
+        "title": "接入模式",
+        "enum": [
+          "websocket",
+          "webhook"
+        ],
+        "default": "websocket"
+      },
+      "verificationToken": {
+        "type": "string",
+        "title": "Verification Token"
+      },
+      "encryptKey": {
+        "type": "string",
+        "title": "Encrypt Key",
+        "secret": true
+      }
+    },
+    "required": [
+      "baseUrl",
+      "appId",
+      "appSecret"
+    ]
+  },
+  "secretFields": [
+    "appSecret",
+    "encryptKey"
+  ],
+  "resources": {
+    "readmePath": "docs/README.md",
+    "iconPath": "assets/icon.svg",
+    "examplePaths": [
+      "examples/websocket.json",
+      "examples/webhook.json"
+    ],
+    "assetPaths": []
+  },
+  "setupGuide": {
+    "title": "飞书 Connector 插件",
+    "steps": [
+      "启动飞书 connector，并确认可通过 HTTP 访问。",
+      "填写 Connector Base URL、App ID 和 App Secret。",
+      "默认建议使用 websocket 模式，只有需要公网回调时再切到 webhook。"
+    ]
+  }
+}

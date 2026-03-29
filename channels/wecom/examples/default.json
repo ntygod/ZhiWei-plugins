@@ -1,0 +1,7 @@
+{
+  "baseUrl": "http://127.0.0.1:19002",
+  "corpId": "wwxxxxxxxxxxxxxxxx",
+  "agentId": "1000001",
+  "token": "zhiwei-wecom-token",
+  "encodingAesKey": "******"
+}

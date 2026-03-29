@@ -1,0 +1,15 @@
+# PowerShell / generated
+artifacts/
+
+# Maven
+target/
+**/target/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
