@@ -2,6 +2,11 @@
 
 知微官方插件 monorepo。
 
+仓库地址：
+
+- `ZhiWei-plugins`: `https://github.com/ntygod/ZhiWei-plugins`
+- `ZhiWei-index`: `https://github.com/ntygod/ZhiWei-index`
+
 这个仓库用于维护：
 
 - 官方渠道插件包
@@ -60,7 +65,25 @@ pwsh -NoProfile -File .\tools\export-channel-index.ps1 -OutputPath .\artifacts\i
 pwsh -NoProfile -File .\tools\export-channel-index.ps1 `
   -ExistingIndexPath .\index.json `
   -OutputPath .\artifacts\index.merged.json
+Move-Item .\artifacts\index.merged.json .\index.json -Force
 ```
+
+## 自动发布索引
+
+仓库内置了自动同步 `ZhiWei-index` 的工作流：
+
+- `.github/workflows/publish-index.yml`
+
+它会在 `channels/**` 或导出脚本变更后：
+
+1. 导出渠道索引
+2. 拉取 `ZhiWei-index`
+3. 合并旧索引中的非渠道条目
+4. 自动提交并推送新的 `index.json`
+
+工作流依赖仓库 secret：
+
+- `ZHIWEI_INDEX_PUSH_TOKEN`
 
 ## connector 开发
 

@@ -1,0 +1,54 @@
+name: Publish Index
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'channels/**'
+      - 'tools/export-channel-index.ps1'
+      - '.github/workflows/publish-index.yml'
+  workflow_dispatch:
+
+jobs:
+  publish-index:
+    if: ${{ secrets.ZHIWEI_INDEX_PUSH_TOKEN != '' }}
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout plugins repo
+        uses: actions/checkout@v4
+
+      - name: Export channel index
+        shell: pwsh
+        run: |
+          ./tools/export-channel-index.ps1 -OutputPath ./artifacts/channel-index.json
+
+      - name: Checkout index repo
+        uses: actions/checkout@v4
+        with:
+          repository: ntygod/ZhiWei-index
+          token: ${{ secrets.ZHIWEI_INDEX_PUSH_TOKEN }}
+          path: index-repo
+
+      - name: Merge channel entries into index repo
+        shell: pwsh
+        run: |
+          ./tools/export-channel-index.ps1 `
+            -ExistingIndexPath ./index-repo/index.json `
+            -OutputPath ./index-repo/index.generated.json
+          Move-Item ./index-repo/index.generated.json ./index-repo/index.json -Force
+
+      - name: Commit and push index
+        shell: pwsh
+        run: |
+          Set-Location ./index-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if (-not (git status --porcelain)) {
+            Write-Output "索引没有变化，跳过提交。"
+            exit 0
+          }
+          git add index.json
+          git commit -m "chore(index): 同步渠道插件索引"
+          git push origin HEAD:main
