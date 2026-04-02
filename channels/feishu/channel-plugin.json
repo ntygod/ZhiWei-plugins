@@ -8,13 +8,23 @@
   "connectorSpec": {
     "protocol": "http",
     "pathPrefix": "/instances/{instanceId}",
-    "image": "ghcr.io/zhiwei/connectors/feishu:1.0.0"
+    "image": "ghcr.io/zhiwei/connectors/feishu:1.0.0",
+    "managed": {
+      "strategy": "installed-jar",
+      "artifactPath": "dist/feishu-connector.jar",
+      "workspace": "connectors/feishu-connector",
+      "healthPath": "/actuator/health",
+      "preferredPort": 19091
+    }
   },
   "capabilities": [
     "receive",
     "send",
     "thread-reply",
-    "card-update"
+    "card-update",
+    "card-action",
+    "image",
+    "file"
   ],
   "configSchema": {
     "type": "object",
@@ -22,7 +32,7 @@
       "baseUrl": {
         "type": "string",
         "title": "Connector Base URL",
-        "description": "飞书 connector 的 HTTP 基础地址。"
+        "description": "可选。填写后将优先连接自建飞书 connector；留空时由知微主服务优先尝试自动托管官方 connector。"
       },
       "appId": {
         "type": "string",
@@ -53,7 +63,6 @@
       }
     },
     "required": [
-      "baseUrl",
       "appId",
       "appSecret"
     ]
@@ -69,14 +78,16 @@
       "examples/websocket.json",
       "examples/webhook.json"
     ],
-    "assetPaths": []
+    "assetPaths": [
+      "dist/feishu-connector.jar"
+    ]
   },
   "setupGuide": {
     "title": "飞书 Connector 插件",
     "steps": [
-      "启动飞书 connector，并确认可通过 HTTP 访问。",
-      "填写 Connector Base URL、App ID 和 App Secret。",
-      "默认建议使用 websocket 模式，只有需要公网回调时再切到 webhook。"
+      "默认只需要填写 App ID 和 App Secret；安装包已包含官方 connector 运行时，主服务会优先自动托管。",
+      "如果你要连接自建 connector，可额外填写 Connector Base URL 覆盖默认托管。",
+      "推荐优先使用 websocket；如果需要公网回调，可切换为 webhook 并补齐 Verification Token 与 Encrypt Key。"
     ]
   }
 }

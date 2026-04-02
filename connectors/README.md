@@ -5,10 +5,10 @@
 当前包含：
 
 - `mock-http-connector`
+- `feishu-connector`
 
 后续建议新增：
 
-- `feishu-connector`
 - `wecom-connector`
 - `dingtalk-connector`
 
@@ -19,6 +19,7 @@
 - `POST /instances/{instanceId}/reload`
 - `GET /instances/{instanceId}/health`
 - `POST /instances/{instanceId}/deliver`
+- 如平台需要公网事件订阅，建议额外实现 `POST /instances/{instanceId}/webhook`
 
 如需主动回调主服务，还应调用：
 

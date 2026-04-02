@@ -1,0 +1,12 @@
+server:
+  port: 19091
+
+spring:
+  application:
+    name: feishu-connector
+
+connector:
+  runtime:
+    zhiwei-base-url: "${CONNECTOR_RUNTIME_ZHIWEI_BASE_URL:http://127.0.0.1:8080}"
+    image-download-timeout: 15s
+    image-max-bytes: 10485760
