@@ -1,0 +1,71 @@
+{
+  "pluginId": "qq",
+  "name": "QQ 机器人",
+  "version": "1.0.0",
+  "vendor": "zhiwei",
+  "platform": "qq",
+  "connectorMode": "EXTERNAL",
+  "connectorSpec": {
+    "protocol": "http",
+    "pathPrefix": "/instances/{instanceId}",
+    "managed": {
+      "strategy": "installed-jar",
+      "artifactPath": "dist/qq-connector.jar",
+      "workspace": "connectors/qq-connector",
+      "healthPath": "/actuator/health",
+      "preferredPort": 19094
+    }
+  },
+  "capabilities": [
+    "receive",
+    "send",
+    "image"
+  ],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "title": "Connector Base URL",
+        "description": "可选。填写后将优先连接自建 QQ connector；留空时由知微主服务优先尝试自动托管官方 connector。"
+      },
+      "appId": {
+        "type": "string",
+        "title": "App ID",
+        "description": "QQ 机器人开放平台的 AppID"
+      },
+      "appSecret": {
+        "type": "string",
+        "title": "App Secret",
+        "description": "QQ 机器人开放平台的 AppSecret",
+        "secret": true
+      }
+    },
+    "required": [
+      "appId",
+      "appSecret"
+    ]
+  },
+  "secretFields": [
+    "appSecret"
+  ],
+  "resources": {
+    "readmePath": "docs/README.md",
+    "iconPath": "assets/icon.svg",
+    "examplePaths": [
+      "examples/default.json"
+    ],
+    "assetPaths": [
+      "dist/qq-connector.jar"
+    ]
+  },
+  "setupGuide": {
+    "title": "QQ 机器人 Connector 插件",
+    "steps": [
+      "前往 QQ 开放平台 (q.qq.com) 创建机器人应用，获取 App ID 和 App Secret。",
+      "在机器人管理后台开启「群聊」和「私聊」消息权限（需要 GROUP_AND_C2C_EVENT intent）。",
+      "在下方填写 App ID 和 App Secret，保存并启动实例。",
+      "将机器人添加到目标 QQ 群，在群中 @机器人 即可对话；私聊直接发消息即可。"
+    ]
+  }
+}

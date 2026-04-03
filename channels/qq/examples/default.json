@@ -1,0 +1,11 @@
+{
+  "instanceId": "qq.default",
+  "pluginId": "qq",
+  "platform": "qq",
+  "displayName": "QQ 机器人",
+  "enabled": true,
+  "config": {
+    "appId": "你的 AppID",
+    "appSecret": "你的 AppSecret"
+  }
+}
