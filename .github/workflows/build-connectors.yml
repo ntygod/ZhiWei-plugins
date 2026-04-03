@@ -1,0 +1,52 @@
+name: Build Connector JARs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'connectors/*/src/**'
+      - 'connectors/*/pom.xml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 22
+
+      - name: Build and copy connector JARs
+        run: |
+          declare -A CONNECTOR_MAP=(
+            ["feishu-connector"]="feishu"
+            ["qq-connector"]="qq"
+          )
+          for connector in "${!CONNECTOR_MAP[@]}"; do
+            channel="${CONNECTOR_MAP[$connector]}"
+            if [ -d "connectors/$connector" ]; then
+              echo "::group::Building $connector"
+              cd "connectors/$connector"
+              mvn -B -q package -DskipTests
+              cd ../..
+              mkdir -p "channels/$channel/dist"
+              cp "connectors/$connector/target/$connector"-*.jar \
+                 "channels/$channel/dist/$connector.jar"
+              echo "::endgroup::"
+            fi
+          done
+
+      - name: Commit built JARs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add channels/*/dist/*.jar
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          git commit -m "ci: build connector JARs"
+          git push
