@@ -78,10 +78,11 @@ public class QqBotApiClient {
     /** 关闭客户端，释放资源。 */
     public void shutdown() {
         refreshScheduler.shutdownNow();
+        httpClient.close();
     }
 
     /** 获取当前有效的 access_token。若已过期则同步刷新。 */
-    public String acquireAccessToken() {
+    public synchronized String acquireAccessToken() {
         if (accessToken == null || Instant.now().isAfter(tokenExpiresAt)) {
             refreshAccessToken();
         }

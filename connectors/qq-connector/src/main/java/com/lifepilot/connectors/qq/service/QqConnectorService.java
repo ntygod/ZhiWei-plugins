@@ -109,10 +109,11 @@ public class QqConnectorService {
         return state.commandResult("RUNNING", "QQ connector 已启动");
     }
 
-    /** 停止 QQ 机器人实例。 */
+    /** 停止 QQ 机器人实例并从管理列表移除。 */
     public Map<String, Object> stop(String instanceId) {
         QqInstanceState state = requireState(instanceId);
         state.shutdown();
+        instances.remove(instanceId);
         log.info("QQ 实例已停止: instanceId={}", instanceId);
         return state.commandResult("STOPPED", "QQ connector 已停止");
     }

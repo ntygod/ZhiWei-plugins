@@ -74,6 +74,7 @@ public class QqWebSocketManager {
     private final ObjectMapper objectMapper;
     private final Consumer<QqDispatchEvent> eventConsumer;
     private final ScheduledExecutorService scheduler;
+    private final HttpClient wsHttpClient;
 
     private volatile WebSocket webSocket;
     private volatile String sessionId;
@@ -101,6 +102,9 @@ public class QqWebSocketManager {
         this.scheduler = Executors.newSingleThreadScheduledExecutor(
                 Thread.ofVirtual().name("qq-ws-scheduler").factory()
         );
+        this.wsHttpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(15))
+                .build();
     }
 
     // ── 公开接口 ────────────────────────────────────────────────
@@ -158,10 +162,7 @@ public class QqWebSocketManager {
         try {
             String gatewayUrl = apiClient.resolveGatewayUrl();
             log.info("正在连接 QQ WebSocket 网关: {}", gatewayUrl);
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(15))
-                    .build();
-            client.newWebSocketBuilder()
+            wsHttpClient.newWebSocketBuilder()
                     .connectTimeout(Duration.ofSeconds(15))
                     .buildAsync(URI.create(gatewayUrl), new QqWebSocketListener())
                     .thenAccept(ws -> {
