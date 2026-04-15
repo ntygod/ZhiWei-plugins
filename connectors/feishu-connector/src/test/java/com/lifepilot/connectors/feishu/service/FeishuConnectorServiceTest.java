@@ -214,6 +214,7 @@ class FeishuConnectorServiceTest {
         verify(callbackClient).submitEvent(eq("feishu-1"), eq("runtime-token"), argThat(request ->
                 "card-action".equals(request.content().type())
                         && "触发了卡片动作: 通过".equals(request.content().text())
+                        && "approve".equals(request.content().name())
                         && request.content().payload() != null
                         && request.content().payload().containsKey("action")
         ));
@@ -378,8 +379,8 @@ class FeishuConnectorServiceTest {
                         "actions", List.of(
                                 Map.of(
                                         "label", "通过",
-                                        "name", "approve",
-                                        "value", Map.of("action", "approve", "label", "通过")
+                                        "type", "callback",
+                                        "value", "approve"
                                 )
                         )
                 )),

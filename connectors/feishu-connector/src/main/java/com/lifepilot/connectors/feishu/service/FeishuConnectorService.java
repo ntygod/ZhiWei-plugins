@@ -608,6 +608,7 @@ public class FeishuConnectorService {
                                                            @Nullable JsonNode contentJson) {
         Map<String, Object> payload = extractPayload(contentJson, message.content());
         String text = buildCardActionText(payload);
+        String actionName = resolveCardActionName(payload);
         LinkedHashMap<String, Object> metadata = new LinkedHashMap<>(mergeMetadata(state, message));
         metadata.put("eventKind", "card-action");
         return new ConnectorEventRequest(
@@ -615,7 +616,7 @@ public class FeishuConnectorService {
                 message.messageId(),
                 resolveUserId(message),
                 message.chatId(),
-                new ConnectorEventRequest.Content("card-action", text, null, payload),
+                new ConnectorEventRequest.Content("card-action", text, actionName, payload),
                 List.of(),
                 Map.copyOf(metadata),
                 new ConnectorEventRequest.DeliveryHints("ASYNC_PUSH"),
@@ -865,30 +866,23 @@ public class FeishuConnectorService {
                 "tag", "plain_text",
                 "content", label
         ));
-        element.put("type", defaultString(asString(action.get("type")), "default"));
 
-        String url = asString(action.get("url"));
-        if (url != null) {
+        String actionType = defaultString(asString(action.get("type")), "callback");
+
+        if ("url".equals(actionType)) {
+            element.put("type", "default");
             element.put("behaviors", List.of(Map.of(
                     "type", "open_url",
-                    "default_url", url
+                    "default_url", asString(action.get("value"))
             )));
             return Map.copyOf(element);
         }
 
-        String name = asString(action.get("name"));
-        if (name != null) {
-            element.put("name", name);
-        }
-        Object value = action.get("value");
-        if (value instanceof Map<?, ?> map) {
-            element.put("value", normalizeMap(map));
-        } else {
-            element.put("value", Map.of(
-                    "label", label,
-                    "action", defaultString(name, label)
-            ));
-        }
+        // 回调按钮 — 点击后触发平台回调事件，不跳转 URL
+        element.put("type", "default");
+        String callbackValue = defaultString(asString(action.get("value")), label);
+        element.put("name", callbackValue);
+        element.put("value", Map.of("action", callbackValue));
         return Map.copyOf(element);
     }
 
@@ -1066,6 +1060,27 @@ public class FeishuConnectorService {
             return "触发了卡片动作: " + tag;
         }
         return "触发了卡片动作";
+    }
+
+    /**
+     * 从卡片回调 payload 中提取 action 标识。
+     *
+     * <p>优先取 {@code action.name}（回调按钮的 name 字段），
+     * 回退取 {@code action.value.action}。知微后端依赖此值识别审批回调。</p>
+     */
+    @Nullable
+    private String resolveCardActionName(Map<String, Object> payload) {
+        Map<String, Object> action = nestedMap(payload.get("action"));
+        String name = asString(action.get("name"));
+        if (name != null && !name.isBlank()) {
+            return name;
+        }
+        Map<String, Object> value = nestedMap(action.get("value"));
+        String valueAction = asString(value.get("action"));
+        if (valueAction != null && !valueAction.isBlank()) {
+            return valueAction;
+        }
+        return null;
     }
 
     private String resolveFileKey(ConnectorDeliveryRequest.Content content,
