@@ -878,11 +878,13 @@ public class FeishuConnectorService {
             return Map.copyOf(element);
         }
 
-        // 回调按钮 — 点击后触发平台回调事件，不跳转 URL
+        // 回调按钮 — schema 2.0 使用 behaviors callback，点击后触发平台回调事件
         element.put("type", "default");
         String callbackValue = defaultString(asString(action.get("value")), label);
-        element.put("name", callbackValue);
-        element.put("value", Map.of("action", callbackValue));
+        element.put("behaviors", List.of(Map.of(
+                "type", "callback",
+                "value", Map.of("action", callbackValue)
+        )));
         return Map.copyOf(element);
     }
 

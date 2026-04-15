@@ -390,7 +390,7 @@ class FeishuConnectorServiceTest {
 
         verify(session).send(argThat(message ->
                 "interactive".equals(message.msgType())
-                        && message.content().contains("\"name\":\"approve\"")
+                        && message.content().contains("\"type\":\"callback\"")
                         && message.content().contains("\"action\":\"approve\"")
         ));
     }
