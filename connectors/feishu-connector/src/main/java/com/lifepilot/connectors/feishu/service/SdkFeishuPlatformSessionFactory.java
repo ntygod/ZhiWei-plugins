@@ -1,6 +1,8 @@
 package com.lifepilot.connectors.feishu.service;
 
 import com.lark.oapi.Client;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.lark.oapi.core.request.EventReq;
 import com.lark.oapi.core.response.EventResp;
 import com.lark.oapi.core.utils.Jsons;
@@ -85,6 +87,8 @@ import java.util.function.Function;
  */
 @Component
 public class SdkFeishuPlatformSessionFactory implements FeishuPlatformSessionFactory {
+
+    private static final Logger log = LoggerFactory.getLogger(SdkFeishuPlatformSessionFactory.class);
 
     @Override
     public FeishuPlatformSession create(FeishuInstanceSettings settings,
@@ -514,8 +518,21 @@ public class SdkFeishuPlatformSessionFactory implements FeishuPlatformSessionFac
                     .onP2CardActionTrigger(new P2CardActionTriggerHandler() {
                         @Override
                         public P2CardActionTriggerResponse handle(P2CardActionTrigger event) {
-                            FeishuInboundHandlingResult result = inboundHandler.apply(toCardActionInboundMessage(event));
-                            return buildCardActionResponse(result);
+                            try {
+                                log.info("收到卡片回调事件: eventId={}",
+                                        event.getHeader() != null ? event.getHeader().getEventId() : "unknown");
+                                FeishuInboundHandlingResult result = inboundHandler.apply(toCardActionInboundMessage(event));
+                                log.info("卡片回调处理完成: type={}, content={}", result.toastType(), result.toastContent());
+                                return buildCardActionResponse(result);
+                            } catch (Exception e) {
+                                log.error("卡片回调处理异常", e);
+                                P2CardActionTriggerResponse response = new P2CardActionTriggerResponse();
+                                CallBackToast toast = new CallBackToast();
+                                toast.setType("error");
+                                toast.setContent("处理失败");
+                                response.setToast(toast);
+                                return response;
+                            }
                         }
                     })
                     .onP2MessageReceiveV1(new ImService.P2MessageReceiveV1Handler() {

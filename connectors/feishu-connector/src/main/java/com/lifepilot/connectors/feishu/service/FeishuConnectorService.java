@@ -728,7 +728,7 @@ public class FeishuConnectorService {
         return switch (type) {
             case "card" -> renderCardMessage(content);
             case "streaming" -> renderInteractiveCompatibleMessage(content, renderStreamingText(content));
-            case "markdown" -> renderPostMessage(content);
+            case "markdown" -> renderInteractiveCompatibleMessage(content, defaultString(content.plainText(), ""));
             case "image" -> renderImageMessage(content, attachments, state);
             case "file" -> renderFileMessage(content, attachments, state);
             case "text" -> new FeishuRenderedMessage(

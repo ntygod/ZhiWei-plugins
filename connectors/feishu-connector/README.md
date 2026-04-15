@@ -70,16 +70,26 @@ mvn spring-boot:run -f connectors/feishu-connector/pom.xml
 
 ## 卡片动作
 
-卡片 `payload.actions[]` 中：
+卡片 `payload.actions[]` 中，根据 `type` 字段区分按钮类型：
 
-- 有 `url` 的动作会渲染成跳转按钮
-- 没有 `url` 且有 `label` 的动作会渲染成回调按钮
+- `type = "url"`：渲染为链接跳转按钮（`behaviors: [{type: "open_url"}]`）
+- `type = "callback"`（默认）：渲染为回调按钮（`behaviors: [{type: "callback"}]`）
 
 回调按钮点击后，connector 会向知微主服务提交统一入站事件：
 
 - `content.type = card-action`
+- `content.name`：从回调 `action.value.action` 提取的回调标识
 - `content.payload.action`
 - `content.payload.context`
 - `content.payload.operator`
 
 如果知微主服务对这次动作返回了文本投递，connector 会优先把第一条文本投递提取成飞书即时 toast。
+
+### 飞书应用配置要求
+
+要使卡片回调按钮正常工作，飞书应用必须开启「卡片交互回调」：
+
+- WebSocket 模式：回调方式选择「使用长连接接收」
+- Webhook 模式：填写回调 URL
+
+未开启此配置时，点击回调按钮会返回飞书错误码 200080。
