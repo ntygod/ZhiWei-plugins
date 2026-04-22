@@ -563,11 +563,10 @@ public class FeishuConnectorService {
                     Object sizeObj = downloaded.get("size");
                     long size = sizeObj instanceof Number num ? num.longValue() : 0;
                     String fileName = firstNonBlank(readTextField(contentJson, "file_name"), asString(downloaded.get("fileName")));
-                    String mimeType = switch (msgType) {
-                        case "audio" -> "audio/ogg";
-                        case "media" -> "video/mp4";
-                        default -> "application/octet-stream";
-                    };
+                    // 飞书 msgType=file 的消息没有 MIME 字段；按 fileName 扩展名推断真实 MIME，
+                    // 让主服务能正确把 docx/xlsx/pdf 识别成文档类（否则主服务拿到 octet-stream
+                    // 无法走文档 parser 路由、无法做附件上下文注入）
+                    String mimeType = inferInboundMimeType(msgType, fileName);
                     yield List.of(new ConnectorEventRequest.Attachment(
                             fileKey,
                             fileName,
@@ -2044,5 +2043,56 @@ public class FeishuConnectorService {
                 payload.put(key, value);
             }
         }
+    }
+
+    /**
+     * 根据飞书 msgType + fileName 推断真实 MIME。
+     *
+     * <p>飞书 msgType=file 的普通文件下载接口不返回 MIME，原实现硬编码
+     * {@code application/octet-stream}，导致主服务文档 parser 路由失败、附件上下文
+     * 注入白名单匹配失败。这里按 fileName 扩展名兜底推断，让 connector 上报的 MIME
+     * 真实反映文件类型。</p>
+     *
+     * <p>覆盖范围：docx/xlsx/pptx/pdf/md/csv/tsv/txt/json/xml/html 和常见媒体类型。
+     * 未知扩展名保持 {@code application/octet-stream}，交给主服务做进一步判断。</p>
+     */
+    static String inferInboundMimeType(String msgType, String fileName) {
+        if ("audio".equals(msgType)) return "audio/ogg";
+        if ("media".equals(msgType)) return "video/mp4";
+        if (fileName == null) return "application/octet-stream";
+        String lower = fileName.toLowerCase();
+        int dot = lower.lastIndexOf('.');
+        if (dot < 0 || dot == lower.length() - 1) return "application/octet-stream";
+        String ext = lower.substring(dot + 1);
+        return switch (ext) {
+            case "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            case "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            case "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+            case "doc" -> "application/msword";
+            case "xls" -> "application/vnd.ms-excel";
+            case "ppt" -> "application/vnd.ms-powerpoint";
+            case "pdf" -> "application/pdf";
+            case "md", "markdown", "mkd" -> "text/markdown";
+            case "csv" -> "text/csv";
+            case "tsv" -> "text/tab-separated-values";
+            case "txt", "text", "log" -> "text/plain";
+            case "json" -> "application/json";
+            case "xml" -> "application/xml";
+            case "html", "htm" -> "text/html";
+            case "zip" -> "application/zip";
+            case "gz", "gzip" -> "application/gzip";
+            case "tar" -> "application/x-tar";
+            case "mp3" -> "audio/mpeg";
+            case "wav" -> "audio/wav";
+            case "mp4" -> "video/mp4";
+            case "mov" -> "video/quicktime";
+            case "avi" -> "video/x-msvideo";
+            case "png" -> "image/png";
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            case "svg" -> "image/svg+xml";
+            default -> "application/octet-stream";
+        };
     }
 }
