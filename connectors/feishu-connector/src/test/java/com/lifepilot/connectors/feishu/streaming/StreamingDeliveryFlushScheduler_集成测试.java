@@ -100,6 +100,32 @@ class StreamingDeliveryFlushScheduler_集成测试 {
     }
 
     @Test
+    void 单_entry_的_flushAction_抛异常_不影响同_tick_其他_entry() throws InterruptedException {
+        var queue = new StreamingDeliveryQueue();
+        AtomicInteger goodFlushCount = new AtomicInteger();
+        FlushAction action = (instanceId, rid, text) -> {
+            if ("rid-bad".equals(rid)) {
+                throw new RuntimeException("simulated flush failure");
+            }
+            goodFlushCount.incrementAndGet();
+            return FlushOutcome.OK;
+        };
+        var scheduler = new StreamingDeliveryFlushScheduler(
+                queue, FeishuStreamingPolicy.defaults(), action);
+        scheduler.start();
+        try {
+            queue.enqueue("i1", "rid-bad", "x", Instant.now());
+            queue.enqueue("i1", "rid-good", "y", Instant.now());
+            // 等待至少一次 tick 处理过两个 entry
+            await().atMost(Duration.ofSeconds(2))
+                    .until(() -> goodFlushCount.get() >= 1);
+            assertThat(goodFlushCount.get()).isGreaterThanOrEqualTo(1);
+        } finally {
+            scheduler.stop();
+        }
+    }
+
+    @Test
     void idle_超过30s_的_rid_最后flush_后清理() throws InterruptedException {
         var queue = new StreamingDeliveryQueue();
         // 创建一个 idle 已久的 entry（手工塞入）

@@ -72,7 +72,12 @@ public class StreamingDeliveryFlushScheduler {
                 return;  // 全局退避中，跳过本轮
             }
             for (StreamingDeliveryEntry entry : queue.snapshot()) {
-                processEntry(entry, now);
+                // per-entry 隔离：单个 entry 的 flushAction 抛异常不应影响同 tick 其他 entry
+                try {
+                    processEntry(entry, now);
+                } catch (Throwable t) {
+                    log.warn("processEntry 失败 rid={}: {}", entry.responseId(), t.getMessage(), t);
+                }
             }
         } catch (Throwable t) {
             log.warn("flusher tick 异常: {}", t.getMessage(), t);
@@ -109,9 +114,11 @@ public class StreamingDeliveryFlushScheduler {
                         entry.responseId(), next, now.plus(backoff));
             }
             case NOT_FOUND -> {
-                // 主服务无感继续；标记已尝试，让下次循环过 minInterval 后再发（视作 send 新消息）
+                // 该 outcome 仅表示 update 失败 → action 内部需自行降级 send（删 SentMessageRef，
+                // 下次 tick 同 rid 进来时走 newMessage 路径并保存新 ref）。Scheduler 仅推进
+                // lastFlushAt 让下次循环按 minInterval 节流，不参与降级编排。
                 queue.update(entry.withFlushedAt(now));
-                log.info("飞书消息 404 — 视为撤回，标记已尝试: rid={}", entry.responseId());
+                log.info("飞书消息 404 — 视为撤回，scheduler 标记已尝试: rid={}", entry.responseId());
             }
             case TRANSIENT -> log.debug("flush 5xx 静默重试: rid={}", entry.responseId());
         }
