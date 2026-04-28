@@ -11,6 +11,8 @@ import com.lifepilot.connectors.feishu.model.ConnectorEventResponse;
 import com.lifepilot.connectors.feishu.model.ConnectorInstanceCommandRequest;
 import com.lifepilot.connectors.feishu.model.ConnectorOperationRequest;
 import com.lifepilot.connectors.feishu.model.ConnectorOperationResponse;
+import com.lifepilot.connectors.feishu.streaming.FlushOutcome;
+import com.lifepilot.connectors.feishu.streaming.StreamingDeliveryQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
@@ -48,11 +50,13 @@ public class FeishuConnectorService {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
     private final long imageMaxBytes;
+    private final StreamingDeliveryQueue streamingQueue;
 
     public FeishuConnectorService(ConnectorCallbackClient connectorCallbackClient,
                                   FeishuPlatformSessionFactory sessionFactory,
                                   ObjectMapper objectMapper,
-                                  ConnectorRuntimeProperties runtimeProperties) {
+                                  ConnectorRuntimeProperties runtimeProperties,
+                                  StreamingDeliveryQueue streamingQueue) {
         this.connectorCallbackClient = connectorCallbackClient;
         this.sessionFactory = sessionFactory;
         this.objectMapper = objectMapper;
@@ -60,6 +64,7 @@ public class FeishuConnectorService {
                 .connectTimeout(runtimeProperties.getImageDownloadTimeout())
                 .build();
         this.imageMaxBytes = runtimeProperties.getImageMaxBytes();
+        this.streamingQueue = streamingQueue;
     }
 
     public boolean hasInstance(String instanceId) {
@@ -193,6 +198,154 @@ public class FeishuConnectorService {
             payload.put("messageId", result.messageId());
         }
         return Map.copyOf(payload);
+    }
+
+    /**
+     * 接收主服务流式 deliver 请求，把最新一份 accText 入队等待 scheduler 异步 flush。
+     *
+     * <p>此方法立刻返回，不直接调飞书 SDK，避免高频 PATCH 流量拖垮接口。真正落地由
+     * {@link com.lifepilot.connectors.feishu.streaming.StreamingDeliveryFlushScheduler}
+     * 按节流策略调用 {@link #flushStreamingDelivery}。</p>
+     *
+     * <p>fail-fast 校验链：实例存在 → responseId 非空 → 必须有可用 chatId
+     * （request.target.sessionId 或 state.lastChatId 至少一个）。无 chatId 直接拒绝入队抛
+     * IllegalArgumentException，避免 scheduler 在 buildStreamingTextMessage 处死循环重试到 idle 30s 才清理。</p>
+     *
+     * <p>边界场景说明（无 chatId 必爆）：
+     * <ul>
+     *   <li>主服务重启后实例 lastChatId=null</li>
+     *   <li>"任务定时推送" / workflow 主动推送（无 inbound 触发）</li>
+     *   <li>同实例并发服务多 chat 时 lastChatId 互相覆盖</li>
+     * </ul>
+     * 这些场景应走 ASYNC_PUSH，PATCH_STREAM 当前仅支持 inbound→reply 同 turn 模式。</p>
+     *
+     * @param instanceId 飞书实例 id
+     * @param request    含 responseId / content 的请求;不存在的实例会抛出 IllegalArgumentException
+     */
+    public void enqueueStreamingDelivery(String instanceId, ConnectorDeliveryRequest request) {
+        // 校验实例存在;未启动直接 fail-fast,避免 lost update
+        FeishuInstanceState state = requireState(instanceId);
+        String responseId = request.responseId();
+        if (responseId == null || responseId.isBlank()) {
+            throw new IllegalArgumentException("流式投递缺少 responseId");
+        }
+        // C1 fail-fast:流式投递必须有可用 chatId(target.sessionId 或 state.lastChatId 至少一个),
+        // 否则下游 buildStreamingTextMessage 会抛 IllegalStateException → scheduler 归 TRANSIENT
+        // 死循环重试到 idle 30s 才清理。这里直接拒绝入队,让 controller 502 而不污染队列。
+        String targetChatId = request.target() != null ? request.target().sessionId() : null;
+        boolean hasTargetChatId = targetChatId != null && !targetChatId.isBlank();
+        if (!hasTargetChatId && state.lastChatId() == null) {
+            throw new IllegalArgumentException(
+                    "流式投递无可用 chatId(既无 target.sessionId 也无 lastChatId),"
+                            + "PATCH_STREAM 当前仅支持 inbound→reply 同 turn 模式,"
+                            + "主动推送或重启后首条流式请走 ASYNC_PUSH");
+        }
+        String accText = extractStreamingText(request);
+        streamingQueue.enqueue(instanceId, responseId, accText, Instant.now());
+    }
+
+    /**
+     * 真实调用飞书 SDK 落地一次流式 flush — 已发过则 update，否则 send 后保存映射。
+     *
+     * <p>异常归一化策略（{@code IllegalStateException} 消息中通常含 {@code code=<num>} 模式）：
+     * <ul>
+     *   <li>消息含 429 / "rate" 关键字 → {@link FlushOutcome#RATE_LIMITED}</li>
+     *   <li>消息含 404 / 410 / 230002（飞书消息撤回）关键字 → 删除 SentMessageRef +
+     *       {@link FlushOutcome#NOT_FOUND}（下次 tick 同 rid 会走 send 路径）</li>
+     *   <li>消息含 5xx 关键字 → {@link FlushOutcome#TRANSIENT}</li>
+     *   <li>未识别异常 → {@link FlushOutcome#TRANSIENT}（保守归类，让 scheduler 重试）</li>
+     * </ul>
+     *
+     * <p>TODO(T16 端到端冒烟): 字符串匹配是临时实现，端到端跑通后改为按 SDK 异常类型 / code 精准映射。</p>
+     *
+     * @param instanceId 实例 id
+     * @param responseId 主服务侧 stable id
+     * @param accText    截至当前的累积文本快照
+     * @return outcome — scheduler 据此决定退避 / 重试
+     */
+    public FlushOutcome flushStreamingDelivery(String instanceId, String responseId, String accText) {
+        FeishuInstanceState state = requireState(instanceId);
+        FeishuSentMessageRef sentRef = state.findResponseMessage(responseId);
+
+        try {
+            if (sentRef != null) {
+                // 已发过 → 调 update；msgType 沿用首次发送时的类型，避免 text↔post 混发被飞书拒绝
+                state.updateMessage(sentRef.messageId(), sentRef.msgType(), serializeTextContent(accText));
+                return FlushOutcome.OK;
+            }
+            // 首次 → 走 text 路径 send；state.send 会按 message.uuid()=responseId 自动保存 SentMessageRef
+            FeishuOutgoingMessage outgoing = buildStreamingTextMessage(state, responseId, accText);
+            state.send(outgoing);
+            return FlushOutcome.OK;
+        } catch (Exception ex) {
+            return mapToOutcome(ex, instanceId, responseId, state);
+        }
+    }
+
+    /**
+     * 构建流式首次发送用的 text 消息 — 复用 lastChatId 作为 receiveId（同一 turn 应已存在）。
+     *
+     * <p>流式 PATCH 的语义是"主服务同一 turn 内多次推增量"，首次入队时应已经有过一次
+     * 同 chat 的入站事件，state.lastChatId 即为合理的目标。若取不到则抛错，让 scheduler 归 TRANSIENT 重试。</p>
+     */
+    private FeishuOutgoingMessage buildStreamingTextMessage(FeishuInstanceState state,
+                                                             String responseId,
+                                                             String accText) {
+        String chatId = state.lastChatId();
+        if (chatId == null || chatId.isBlank()) {
+            throw new IllegalStateException("流式投递无可用 chatId（实例尚未收到任何入站消息）");
+        }
+        return new FeishuOutgoingMessage(
+                FeishuSendRoute.CREATE,
+                null,
+                chatId,
+                "chat_id",
+                "text",
+                serializeTextContent(accText),
+                false,
+                responseId,
+                accText
+        );
+    }
+
+    /**
+     * 从 deliver 请求中抽取流式文本快照 — 优先取 content.plainText，缺省则空串。
+     */
+    private String extractStreamingText(ConnectorDeliveryRequest request) {
+        ConnectorDeliveryRequest.Content content = request.content();
+        if (content == null) {
+            return "";
+        }
+        return defaultString(content.plainText(), "");
+    }
+
+    /**
+     * 把 SDK 异常映射为 {@link FlushOutcome}；未识别归 TRANSIENT 让 scheduler 下次重试。
+     */
+    private FlushOutcome mapToOutcome(Exception ex, String instanceId, String responseId,
+                                      FeishuInstanceState state) {
+        String msg = ex.getMessage() != null ? ex.getMessage() : "";
+        String lower = msg.toLowerCase();
+        if (msg.contains("429") || lower.contains("rate") || msg.contains("99991663")) {
+            log.debug("飞书 flush 触发 429 退避: instanceId={}, rid={}, error={}",
+                    instanceId, responseId, msg);
+            return FlushOutcome.RATE_LIMITED;
+        }
+        // 飞书消息撤回错误码 230002 / 通用 404 / 410 都视为消息不存在 → 删 ref 让下次走 send 路径
+        if (msg.contains("404") || msg.contains("410") || msg.contains("230002")) {
+            state.removeResponseMessage(responseId);
+            log.info("飞书 flush 命中消息不存在: instanceId={}, rid={}, error={}",
+                    instanceId, responseId, msg);
+            return FlushOutcome.NOT_FOUND;
+        }
+        if (msg.contains("500") || msg.contains("502") || msg.contains("503") || msg.contains("504")) {
+            log.debug("飞书 flush 5xx 临时故障: instanceId={}, rid={}, error={}",
+                    instanceId, responseId, msg);
+            return FlushOutcome.TRANSIENT;
+        }
+        log.warn("飞书 flush 未识别异常，归 TRANSIENT 重试: instanceId={}, rid={}, error={}",
+                instanceId, responseId, msg);
+        return FlushOutcome.TRANSIENT;
     }
 
     /**
@@ -1899,6 +2052,22 @@ public class FeishuConnectorService {
                 return null;
             }
             return responseMessages.get(responseId);
+        }
+
+        /**
+         * 删除已记录的 responseId → messageId 映射 — 流式 flush 命中 404/消息撤回时清理，
+         * 让下次同 rid 的 flush 走 send 路径重新建立映射。
+         */
+        synchronized void removeResponseMessage(@Nullable String responseId) {
+            if (responseId == null || responseId.isBlank()) {
+                return;
+            }
+            responseMessages.remove(responseId);
+        }
+
+        @Nullable
+        synchronized String lastChatId() {
+            return lastChatId;
         }
 
         synchronized void recordInboundEvent(FeishuInboundMessage message, @Nullable String responseId) {

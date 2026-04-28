@@ -7,6 +7,7 @@ import com.lifepilot.connectors.feishu.model.ConnectorEventResponse;
 import com.lifepilot.connectors.feishu.model.ConnectorInstanceCommandRequest;
 import com.lifepilot.connectors.feishu.model.ConnectorOperationRequest;
 import com.lifepilot.connectors.feishu.model.ConnectorOperationResponse;
+import com.lifepilot.connectors.feishu.streaming.StreamingDeliveryQueue;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -37,7 +38,7 @@ class FeishuConnectorServiceTest {
         when(sessionFactory.create(any(), any())).thenReturn(session);
         when(session.send(any())).thenReturn(new FeishuSendResult(FeishuSendRoute.CREATE, "text", "om_1"));
 
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
 
         service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
@@ -78,7 +79,7 @@ class FeishuConnectorServiceTest {
         FeishuPlatformSession session = mock(FeishuPlatformSession.class);
         when(sessionFactory.create(any(), any())).thenReturn(session);
 
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
 
         Map<String, Object> result = service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
@@ -131,7 +132,7 @@ class FeishuConnectorServiceTest {
                         ))
                 ));
 
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
         service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
                 "feishu",
@@ -179,7 +180,7 @@ class FeishuConnectorServiceTest {
         when(callbackClient.submitEvent(eq("feishu-1"), eq("runtime-token"), any()))
                 .thenReturn(new ConnectorEventResponse(true, "resp-card-1", 200, null, List.of()));
 
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
         service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
                 "feishu",
@@ -254,7 +255,7 @@ class FeishuConnectorServiceTest {
                         ))
                 ));
 
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
         service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
                 "feishu",
@@ -300,7 +301,7 @@ class FeishuConnectorServiceTest {
                 .thenReturn(new FeishuSendResult(FeishuSendRoute.CREATE, "interactive", "om_1"))
                 .thenReturn(new FeishuSendResult(FeishuSendRoute.PATCH, "interactive", "om_1"));
 
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
         service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
                 "feishu",
@@ -354,7 +355,7 @@ class FeishuConnectorServiceTest {
         when(sessionFactory.create(any(), any())).thenReturn(session);
         when(session.send(any())).thenReturn(new FeishuSendResult(FeishuSendRoute.CREATE, "interactive", "om_1"));
 
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
         service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
                 "feishu",
@@ -401,7 +402,7 @@ class FeishuConnectorServiceTest {
         FeishuPlatformSessionFactory sessionFactory = mock(FeishuPlatformSessionFactory.class);
         FeishuPlatformSession session = mock(FeishuPlatformSession.class);
         when(sessionFactory.create(any(), any())).thenReturn(session);
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
 
         service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
@@ -439,7 +440,7 @@ class FeishuConnectorServiceTest {
                 Map.of("Content-Type", List.of("application/json"))
         ));
 
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
         service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
                 "feishu",
@@ -477,7 +478,7 @@ class FeishuConnectorServiceTest {
         when(session.uploadImage(any())).thenReturn("img_v2_1");
         when(session.send(any())).thenReturn(new FeishuSendResult(FeishuSendRoute.CREATE, "image", "om_img_1"));
 
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
         service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
                 "feishu",
@@ -525,7 +526,7 @@ class FeishuConnectorServiceTest {
         when(session.uploadImage(any())).thenThrow(new IllegalStateException("上传失败"));
         when(session.send(any())).thenReturn(new FeishuSendResult(FeishuSendRoute.CREATE, "interactive", "om_card_1"));
 
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
         service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
                 "feishu",
@@ -571,7 +572,7 @@ class FeishuConnectorServiceTest {
         when(session.uploadFile(any())).thenReturn("file_v2_1");
         when(session.send(any())).thenReturn(new FeishuSendResult(FeishuSendRoute.CREATE, "file", "om_file_1"));
 
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
         service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
                 "feishu",
@@ -619,7 +620,7 @@ class FeishuConnectorServiceTest {
         when(session.uploadFile(any())).thenThrow(new IllegalStateException("上传失败"));
         when(session.send(any())).thenReturn(new FeishuSendResult(FeishuSendRoute.CREATE, "interactive", "om_file_card_1"));
 
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
         service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
                 "feishu",
@@ -995,7 +996,7 @@ class FeishuConnectorServiceTest {
         FeishuPlatformSessionFactory sessionFactory = mock(FeishuPlatformSessionFactory.class);
         when(sessionFactory.create(any(), any())).thenReturn(session);
 
-        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties());
+        FeishuConnectorService service = new FeishuConnectorService(callbackClient, sessionFactory, new ObjectMapper(), runtimeProperties(), new StreamingDeliveryQueue());
         service.start("feishu-1", "runtime-token", new ConnectorInstanceCommandRequest(
                 "feishu-1",
                 "feishu",
