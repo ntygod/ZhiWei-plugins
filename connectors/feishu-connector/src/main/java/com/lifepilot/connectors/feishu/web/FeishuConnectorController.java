@@ -132,6 +132,12 @@ public class FeishuConnectorController {
             return failure.get();
         }
         try {
+            // 流式 PATCH_STREAM 模式 — 入队等待 scheduler 异步 flush，立即 202 返回不阻塞主服务
+            if ("PATCH_STREAM".equalsIgnoreCase(request.deliveryMode())) {
+                feishuConnectorService.enqueueStreamingDelivery(instanceId, request);
+                return ResponseEntity.accepted().build();
+            }
+            // 兜底：原 sync deliver 路径（覆盖 ASYNC_PUSH / 历史 null 调用）
             return ResponseEntity.ok(feishuConnectorService.deliver(instanceId, request));
         } catch (Exception ex) {
             log.warn("飞书主动消息发送失败: instanceId={}", instanceId, ex);
