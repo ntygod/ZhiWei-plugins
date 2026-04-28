@@ -63,6 +63,31 @@ class FeishuConnectorService_streaming_测试 {
     }
 
     @Test
+    void enqueueStreamingDelivery_target缺sessionId且无lastChatId_应fail_fast() throws Exception {
+        // 实例已启动但从未收过 inbound(lastChatId=null),target.sessionId 也为 null
+        // 期望:抛 IllegalArgumentException 拒绝入队,避免下游 scheduler 死循环重试
+        StreamingDeliveryQueue queue = new StreamingDeliveryQueue();
+        FeishuPlatformSession session = mock(FeishuPlatformSession.class);
+        FeishuConnectorService service = startedService(queue, session);
+
+        ConnectorDeliveryRequest req = new ConnectorDeliveryRequest(
+                "feishu-1",
+                "rid-no-chat",
+                "PATCH_STREAM",
+                new ConnectorDeliveryRequest.Target(null, null, Map.of()),
+                new ConnectorDeliveryRequest.Content("text", "hello", Map.of("text", "hello")),
+                List.of(),
+                Map.of()
+        );
+
+        assertThatThrownBy(() -> service.enqueueStreamingDelivery("feishu-1", req))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("无可用 chatId");
+        // 入队前抛错,队列不应留下任何条目
+        assertThat(queue.peek("rid-no-chat")).isEmpty();
+    }
+
+    @Test
     void enqueueStreamingDelivery_启动后_应把最新_accText_快照入队() throws Exception {
         StreamingDeliveryQueue queue = new StreamingDeliveryQueue();
         FeishuPlatformSession session = mock(FeishuPlatformSession.class);

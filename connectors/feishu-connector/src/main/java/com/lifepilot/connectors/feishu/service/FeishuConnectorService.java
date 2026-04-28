@@ -207,15 +207,38 @@ public class FeishuConnectorService {
      * {@link com.lifepilot.connectors.feishu.streaming.StreamingDeliveryFlushScheduler}
      * 按节流策略调用 {@link #flushStreamingDelivery}。</p>
      *
+     * <p>fail-fast 校验链：实例存在 → responseId 非空 → 必须有可用 chatId
+     * （request.target.sessionId 或 state.lastChatId 至少一个）。无 chatId 直接拒绝入队抛
+     * IllegalArgumentException，避免 scheduler 在 buildStreamingTextMessage 处死循环重试到 idle 30s 才清理。</p>
+     *
+     * <p>边界场景说明（无 chatId 必爆）：
+     * <ul>
+     *   <li>主服务重启后实例 lastChatId=null</li>
+     *   <li>"任务定时推送" / workflow 主动推送（无 inbound 触发）</li>
+     *   <li>同实例并发服务多 chat 时 lastChatId 互相覆盖</li>
+     * </ul>
+     * 这些场景应走 ASYNC_PUSH，PATCH_STREAM 当前仅支持 inbound→reply 同 turn 模式。</p>
+     *
      * @param instanceId 飞书实例 id
-     * @param request    含 responseId / content 的请求；不存在的实例会抛出 IllegalArgumentException
+     * @param request    含 responseId / content 的请求;不存在的实例会抛出 IllegalArgumentException
      */
     public void enqueueStreamingDelivery(String instanceId, ConnectorDeliveryRequest request) {
-        // 校验实例存在；未启动直接 fail-fast，避免 lost update
-        requireState(instanceId);
+        // 校验实例存在;未启动直接 fail-fast,避免 lost update
+        FeishuInstanceState state = requireState(instanceId);
         String responseId = request.responseId();
         if (responseId == null || responseId.isBlank()) {
             throw new IllegalArgumentException("流式投递缺少 responseId");
+        }
+        // C1 fail-fast:流式投递必须有可用 chatId(target.sessionId 或 state.lastChatId 至少一个),
+        // 否则下游 buildStreamingTextMessage 会抛 IllegalStateException → scheduler 归 TRANSIENT
+        // 死循环重试到 idle 30s 才清理。这里直接拒绝入队,让 controller 502 而不污染队列。
+        String targetChatId = request.target() != null ? request.target().sessionId() : null;
+        boolean hasTargetChatId = targetChatId != null && !targetChatId.isBlank();
+        if (!hasTargetChatId && state.lastChatId() == null) {
+            throw new IllegalArgumentException(
+                    "流式投递无可用 chatId(既无 target.sessionId 也无 lastChatId),"
+                            + "PATCH_STREAM 当前仅支持 inbound→reply 同 turn 模式,"
+                            + "主动推送或重启后首条流式请走 ASYNC_PUSH");
         }
         String accText = extractStreamingText(request);
         streamingQueue.enqueue(instanceId, responseId, accText, Instant.now());
