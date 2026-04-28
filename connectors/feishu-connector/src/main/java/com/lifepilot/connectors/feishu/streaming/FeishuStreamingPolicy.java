@@ -23,6 +23,20 @@ public record FeishuStreamingPolicy(
         List<Duration> backoffStages,
         Duration idleThreshold
 ) {
+    /**
+     * 紧凑构造器：null 校验 + 空列表 fail-fast + 防御性拷贝。
+     *
+     * <p>避免 Spring binder 注入可变 ArrayList 后被外部 mutate 破坏 record 不可变承诺，
+     * 同时让 backoffDuration 在空列表时不再触发 IndexOutOfBoundsException。
+     */
+    public FeishuStreamingPolicy {
+        java.util.Objects.requireNonNull(backoffStages, "backoffStages 不能为 null");
+        if (backoffStages.isEmpty()) {
+            throw new IllegalArgumentException("backoffStages 不能为空");
+        }
+        backoffStages = List.copyOf(backoffStages);
+    }
+
     public static FeishuStreamingPolicy defaults() {
         return new FeishuStreamingPolicy(
                 Duration.ofSeconds(5),
