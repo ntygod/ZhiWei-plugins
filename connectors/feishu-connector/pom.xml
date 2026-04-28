@@ -53,6 +53,20 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <!-- surefire 默认 includes 不覆盖中文后缀测试类（如 _单元测试 / _集成测试），此处显式扩展 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                        <include>**/*TestCase.java</include>
+                        <include>**/*测试.java</include>
+                        <include>**/*测试_*.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>
